@@ -1,0 +1,1068 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String   @default("کاربر سیستم‌عامل زندگی")
+  email        String?  @unique
+  avatar       String?
+  currency     String   @default("تومان") // تومان یا ریال
+  weightUnit   String   @default("kg")
+  calorieUnit  String   @default("kcal")
+  weekStartDay String   @default("saturday") // شنبه
+  theme        String   @default("dark")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workouts     Workout[]
+}
+
+model Area {
+  id              String   @id @default(cuid())
+  name            String   @unique // e.g. کسب‌وکار لنت، مغازه، رایش / فریلنس، دانشگاه، سلامت، توسعه فردی، مالی، روابط و خانواده، عملیات شخصی
+  icon            String   @default("Folder")
+  color           String   @default("#3b82f6")
+  purpose         String?
+  standard        String?
+  responsible     String?
+  reviewFrequency String   @default("هفتگی")
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tasks          Task[]
+  projects       Project[]
+  calendarBlocks CalendarBlock[]
+  habits         Habit[]
+  objectives     Objective[]
+  notes          Note[]
+}
+
+model GoalVision {
+  id              String   @id @default(cuid())
+  horizon         String   // 1-year, 3-year, 5-year, principles, lifestyle
+  title           String
+  description     String
+  principles      String?
+  desiredLifestyle String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Cycle90Day {
+  id            String      @id @default(cuid())
+  title         String
+  startDate     DateTime
+  endDate       DateTime
+  theme         String
+  currentPhase  String      @default("ساخت") // نجات / ساخت / رشد
+  status        String      @default("active") // active, completed, archived
+  retrospective String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  objectives    Objective[]
+}
+
+model Objective {
+  id                 String      @id @default(cuid())
+  title              String
+  description        String?
+  cycleId            String?
+  cycle              Cycle90Day? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  areaId             String?
+  area               Area?       @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  priority           String      @default("high") // high, medium, low
+  startDate          DateTime?
+  deadline           DateTime?
+  status             String      @default("in_progress") // planned, in_progress, achieved, dropped
+  confidence         Int         @default(80) // 0-100%
+  progress           Int         @default(0) // 0-100%
+  
+  // اطلاعات تفصیلی، استراتژی و اقدام روزانه
+  dailyAction        String?     // عنوان اقدام مشخص روزانه برای پیشبرد این هدف
+  dailyDuration      Int         @default(60) // مدت زمان جلسه روزانه (دقیقه)
+  preferredTimeSlot  String?     // زمان ترجیحی (صبح زود، کار عمیق صبح، عصر، شب)
+  weeklyDays         String?     // روزهای تعهد در هفته (e.g. "شنبه، دوشنبه، چهارشنبه")
+  targetMetric       String?     // عنوان شاخص کلیدی (e.g. "درآمد ماهانه")
+  targetValue        Float?      // مقدار عددی هدف
+  currentValue       Float?      // مقدار عددی فعلی
+  metricUnit         String?     // واحد سنجش (تومان، درصد، کاربر، ...)
+  strategyNotes      String?     // استراتژی اصلی و چرایی
+  potentialObstacles String?     // موانع احتمالی و برنامه مقابله
+  autoSchedule       Boolean     @default(true) // تزریق خودکار به برنامه روزانه
+
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  keyResults         KeyResult[]
+  projects           Project[]
+  tasks              Task[]
+}
+
+model KeyResult {
+  id              String    @id @default(cuid())
+  objectiveId     String
+  objective       Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  metric          String
+  baseline        Float     @default(0)
+  target          Float
+  currentValue    Float     @default(0)
+  unit            String    @default("تعداد")
+  updateFrequency String    @default("هفتگی")
+  progress        Int       @default(0) // calculated %
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Milestone {
+  id        String    @id @default(cuid())
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime?
+  status    String    @default("pending") // pending, completed
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tasks     Task[]
+}
+
+model Project {
+  id             String      @id @default(cuid())
+  title          String
+  description    String?
+  areaId         String?
+  area           Area?       @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  objectiveId    String?
+  objective      Objective?  @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  owner          String      @default("کاربر")
+  status         String      @default("active") // backlog, active, paused, completed, archived
+  priority       String      @default("high")
+  startDate      DateTime?
+  deadline       DateTime?
+  budget         Float       @default(0)
+  actualCost     Float       @default(0)
+  progress       Int         @default(0)
+  health         String      @default("on_track") // on_track, at_risk, delayed
+  expectedOutput String?
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  tasks          Task[]
+  milestones     Milestone[]
+  calendarBlocks CalendarBlock[]
+  transactions   Transaction[]
+}
+
+model Task {
+  id                 String    @id @default(cuid())
+  title              String
+  description        String?
+  areaId             String?
+  area               Area?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  projectId          String?
+  project            Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  objectiveId        String?
+  objective          Objective?@relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+  milestoneId        String?
+  milestone          Milestone?@relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  
+  priority           String    @default("medium") // urgent, high, medium, low
+  urgency            String    @default("normal") // high, normal, low
+  eisenhowerQuadrant String    @default("Q2") // Q1: Do, Q2: Schedule, Q3: Delegate, Q4: Eliminate
+  workType           String    @default("Deep Work") // Deep Work, Shallow Work, Admin, Learning, Health, Routine, Buffer, Rest, Commute
+  
+  estimatedMinutes   Int       @default(30)
+  actualMinutes      Int       @default(0)
+  energyRequirement  String    @default("medium") // high, medium, low
+  
+  dueDate            DateTime?
+  scheduledStart     DateTime?
+  scheduledEnd       DateTime?
+  recurrence         String?   // daily, weekly, monthly
+  
+  status             String    @default("inbox") // inbox, today, next, waiting, delegated, someday, completed
+  kanbanColumn       String    @default("Ready") // Backlog, Ready, Doing, Waiting, Review, Done
+  
+  assignedTo         String?
+  waitingFor         String?
+  dependencies       String?   // comma-separated task IDs
+  tags               String?   // comma-separated tags
+  notes              String?
+  isBigThree         Boolean   @default(false)
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  calendarBlocks     CalendarBlock[]
+}
+
+model KanbanColumn {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  title     String
+  limit     Int?
+  color     String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CalendarBlock {
+  id                String    @id @default(cuid())
+  title             String
+  areaId            String?
+  area              Area?     @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  projectId         String?
+  project           Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  taskId            String?
+  task              Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  
+  start             DateTime
+  end               DateTime
+  plannedDuration   Int       @default(60) // minutes
+  actualDuration    Int       @default(0)
+  
+  type              String    @default("Deep Work") // Deep Work, Shallow Work, Admin, Learning, Health, Routine, Buffer, Rest, Commute
+  dayType           String    @default("روز عادی") // روز طلایی, روز سنگین, روز دانشگاه, روز امتحان, روز بحران, جمعه / CEO Day
+  location          String?
+  energyRequirement String    @default("medium")
+  notes             String?
+  recurrence        String?
+  status            String    @default("scheduled") // scheduled, in_progress, completed, missed
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Routine {
+  id                   String         @id @default(cuid())
+  title                String
+  type                 String         // morning, night, custom
+  trigger              String?        // e.g. ساعت ۶:۰۰ صبح
+  startCondition       String?
+  expectedDuration     Int            @default(30) // minutes
+  streak               Int            @default(0)
+  completionPercentage Int            @default(0)
+  notes                String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  phases               RoutinePhase[]
+  habits               Habit[]
+}
+
+model RoutinePhase {
+  id        String        @id @default(cuid())
+  routineId String
+  routine   Routine       @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  title     String        // e.g. فاز ۱: فعال‌سازی زیستی
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  steps     RoutineStep[]
+}
+
+model RoutineStep {
+  id          String       @id @default(cuid())
+  phaseId     String
+  phase       RoutinePhase @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  title       String
+  durationMin Int          @default(5)
+  isCompleted Boolean      @default(false)
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Habit {
+  id             String     @id @default(cuid())
+  title          String
+  areaId         String?
+  area           Area?      @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  routineId      String?
+  routine        Routine?   @relation(fields: [routineId], references: [id], onDelete: SetNull)
+  trigger        String?
+  frequency      String     @default("daily") // daily, weekly
+  target         Int        @default(1)
+  unit           String     @default("مرتبه")
+  preferredTime  String     @default("صبح") // صبح, ظهر, شب
+  streak         Int        @default(0)
+  completionRate Int        @default(0) // %
+  active         Boolean    @default(true)
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  logs           HabitLog[]
+}
+
+model HabitLog {
+  id        String   @id @default(cuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      DateTime
+  completed Boolean  @default(false)
+  value     Float    @default(1)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+}
+
+model DailyReview {
+  id              String   @id @default(cuid())
+  date            DateTime @unique
+  big3Completed   Int      @default(0) // 0-3
+  whatWentWell    String?
+  whatFailed      String?
+  bottleneck      String?
+  lessonsLearned  String?
+  tomorrowChanges String?
+  gratitude       String?
+  keyInsight      String?
+  mood            String?  // عالی و پرانرژی, متمرکز, معمولی, خسته, پراکنده
+  productivityScore Int    @default(8) // 1-10
+  deepWorkHours   Float    @default(0)
+  customAnswers   String?  // JSON formatted answers to custom questions
+  
+  // Energy Audit 0-10
+  energyPhysical  Int      @default(7)
+  energyEmotional Int      @default(7)
+  energyMental    Int      @default(7)
+  energySpiritual Int      @default(7)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ReviewQuestion {
+  id          String   @id @default(cuid())
+  question    String
+  category    String   @default("عمومی") // عمومی, کسب‌وکار, سلامت, یادگیری, استراتژی
+  placeholder String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WeeklyReview {
+  id            String   @id @default(cuid())
+  weekStart     DateTime @unique
+  startAction   String?  // چه کارهایی شروع شود
+  stopAction    String?  // چه کارهایی متوقف شود
+  continueAction String? // چه کارهایی ادامه یابد
+  goalAudit     String?
+  financeAudit  String?
+  healthAudit   String?
+  nextWeekPlan  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model RootCauseAnalysis {
+  id              String    @id @default(cuid())
+  problem         String
+  symptom         String?
+  why1            String?
+  why2            String?
+  why3            String?
+  why4            String?
+  why5            String?
+  rootCause       String
+  correctiveAction String
+  followUpDate    DateTime?
+  recurrence      String?
+  taskCreated     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Bottleneck {
+  id          String   @id @default(cuid())
+  title       String
+  type        String   // Cognitive, Energy, Environmental, Emotional, Financial, Time, Skill, Dependency
+  impact      String   @default("medium") // high, medium, low
+  solution    String?
+  isResolved  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// =================== سلامت، خواب و تمرین ===================
+
+model BodyMeasurement {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  weight    Float    // kg
+  waist     Float?   // cm
+  chest     Float?   // cm
+  arm       Float?   // cm
+  bodyFat   Float?   // %
+  bmi       Float?
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model NutritionLog {
+  id          String      @id @default(cuid())
+  date        DateTime    @unique
+  calories    Int         @default(0)
+  protein     Float       @default(0) // g
+  carbs       Float       @default(0) // g
+  fat         Float       @default(0) // g
+  fiber       Float       @default(0) // g
+  waterMl     Int         @default(0) // ml
+  targetCals  Int         @default(2400)
+  targetProt  Float       @default(150)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  meals       FoodEntry[]
+}
+
+model FoodEntry {
+  id             String       @id @default(cuid())
+  nutritionLogId String
+  nutritionLog   NutritionLog @relation(fields: [nutritionLogId], references: [id], onDelete: Cascade)
+  mealType       String       // صبحانه، میان‌وعده، ناهار، قبل تمرین، بعد تمرین، شام
+  title          String
+  calories       Int          @default(0)
+  protein        Float        @default(0)
+  carbs          Float        @default(0)
+  fat            Float        @default(0)
+  time           String?
+  createdAt      DateTime     @default(now())
+}
+
+model Workout {
+  id              String            @id @default(cuid())
+  userId          String?
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  date            DateTime
+  title           String            // e.g. سینه و زیربغل، پا و سرشانه
+  durationMinutes Int               @default(60)
+  notes           String?
+  totalVolume     Float             @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  exercises       WorkoutExercise[]
+}
+
+model WorkoutExercise {
+  id          String   @id @default(cuid())
+  workoutId   String
+  workout     Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  name        String   // نام حرکت
+  sets        Int      @default(3)
+  reps        Int      @default(10)
+  weight      Float    @default(0) // kg
+  rpe         Float    @default(8) // 1-10
+  restSeconds Int      @default(90)
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model SleepLog {
+  id                   String   @id @default(cuid())
+  date                 DateTime @unique
+  bedTime              String   // e.g. "23:30"
+  attemptedSleepTime   String?  // "23:45"
+  estimatedSleepOnset  String?  // "00:05"
+  awakenings           Int      @default(0)
+  wakeAfterSleepOnset  Int      @default(0) // minutes
+  finalWakeTime        String   // "07:00"
+  outOfBedTime         String   // "07:15"
+  naps                 Int      @default(0) // minutes
+  caffeineMg           Int      @default(0)
+  screenUsageMinutes   Int      @default(0)
+  exerciseDone         Boolean  @default(false)
+  perceivedQuality     Int      @default(8) // 1-10
+  morningEnergy        Int      @default(8) // 1-10
+  timeInBedMinutes     Int      @default(450)
+  totalSleepTimeMinutes Int     @default(420)
+  sleepEfficiency      Float    @default(93.3) // TST / TIB * 100
+  notes                String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model VoicePractice {
+  id              String   @id @default(cuid())
+  date            DateTime
+  durationMinutes Int      @default(15)
+  exerciseName    String   // تمرین تنفس دیافراگمی، طنین، تلفظ
+  recordingUrl    String?
+  notes           String?
+  streak          Int      @default(1)
+  createdAt       DateTime @default(now())
+}
+
+// =================== حسابداری و مالی کامل ===================
+
+model CostCenter {
+  id          String   @id @default(cuid())
+  name        String   @unique // Personal, Lent, Shop, Rayesh, University, Health
+  code        String   @unique
+  description String?
+  color       String   @default("#3b82f6")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  accounts      FinancialAccount[]
+  transactions  Transaction[]
+  products      Product[]
+  invoices      Invoice[]
+  purchases     Purchase[]
+  budgets       BudgetLine[]
+  cashRegisters ShopCashRegister[]
+  fixedExpenses FixedExpense[]
+  cheques       Cheque[]
+}
+
+model FinancialAccount {
+  id            String   @id @default(cuid())
+  name          String   // e.g. بانک سامان شخصی، حساب لنت، صندوق مغازه، مطالبات رایش
+  type          String   // Cash, Bank, Card, Wallet, Credit, Investment, Business, ShopRegister, Receivable, Payable, Loan
+  bankName      String?
+  accountNumber String?
+  cardNumber    String?
+  currency      String   @default("تومان")
+  balance       Float    @default(0)
+  costCenterId  String?
+  costCenter    CostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  isDefault     Boolean  @default(false)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  fromTransactions Transaction[] @relation("FromAccount")
+  toTransactions   Transaction[] @relation("ToAccount")
+  cheques          Cheque[]
+}
+
+model FixedExpense {
+  id                 String      @id @default(cuid())
+  title              String
+  category           String      // اجاره محل, حقوق و دستمزد, قبوض آب، برق و گاز, بیمه, اینترنت و سرور, مالیات, شارژ, سایر
+  amount             Float
+  dueDayShamsi       Int         @default(1)
+  reminderDaysBefore Int         @default(3)
+  status             String      @default("PENDING") // PENDING, PAID
+  costCenterId       String?
+  costCenter         CostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  note               String?
+  lastPaidDate       DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+}
+
+model Cheque {
+  id            String            @id @default(cuid())
+  chequeNumber  String
+  bankName      String
+  amount        Float
+  dueDate       DateTime
+  dueDateShamsi String?
+  payeeOrPayer  String
+  chequeType    String            @default("PAYABLE") // RECEIVABLE (دریافتی), PAYABLE (پرداختی)
+  status        String            @default("PENDING") // PENDING (معوق), CLEARED (وصول شده), BOUNCED (برگشتی), CANCELLED (باطل شده)
+  bankAccountId String?
+  bankAccount   FinancialAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  costCenterId  String?
+  costCenter    CostCenter?       @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  note          String?
+  clearedAt     DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model FinancialCategory {
+  id        String   @id @default(cuid())
+  name      String   // حقوق، فروش کالا، اجاره، خوراک، سرور، اقساط
+  type      String   // income, expense, transfer
+  icon      String   @default("Tag")
+  color     String   @default("#6b7280")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+  budgetLines  BudgetLine[]
+}
+
+model Transaction {
+  id            String             @id @default(cuid())
+  date          DateTime
+  amount        Float
+  type          String             // Income, Expense, Transfer, Purchase, Sale, DebtPayment, LoanReceived, LoanGiven, Investment, OwnerContribution, OwnerWithdrawal, Adjustment
+  
+  accountFromId String?
+  accountFrom   FinancialAccount?  @relation("FromAccount", fields: [accountFromId], references: [id], onDelete: SetNull)
+  accountToId   String?
+  accountTo     FinancialAccount?  @relation("ToAccount", fields: [accountToId], references: [id], onDelete: SetNull)
+  
+  categoryId    String?
+  category      FinancialCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  costCenterId  String?
+  costCenter    CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  
+  projectId     String?
+  project       Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  
+  counterparty  String?            // طرف حساب (مشتری، فروشنده، شخص)
+  paymentMethod String             @default("کارت / انتقال")
+  description   String?
+  receipt       String?
+  tags          String?
+  reconciled    Boolean            @default(false)
+  
+  // Audit Trail
+  createdSource String             @default("manual") // manual, invoice, pos, automation
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model Product {
+  id             String              @id @default(cuid())
+  sku            String              @unique // کد کالا
+  name           String              // نام کالا مثلاً: لنت جلو پراید گلد
+  category       String              @default("لنت")
+  supplier       String?
+  buyPrice       Float               @default(0)
+  sellPrice      Float               @default(0)
+  stock          Int                 @default(0)
+  minimumStock   Int                 @default(5)
+  costCenterId   String?
+  costCenter     CostCenter?         @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  notes          String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  movements      InventoryMovement[]
+  invoiceItems   InvoiceItem[]
+  purchaseItems  PurchaseItem[]
+}
+
+model InventoryMovement {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type          String   // purchase, sale, return, damage, loss, adjustment
+  quantity      Int      // مثبت برای ورود، منفی برای خروج
+  unitPrice     Float    @default(0)
+  referenceType String?  // invoice, purchase, manual
+  referenceId   String?
+  date          DateTime @default(now())
+  notes         String?
+  createdAt     DateTime @default(now())
+}
+
+model Customer {
+  id           String    @id @default(cuid())
+  name         String
+  phone        String?
+  email        String?
+  costCenterId String?
+  balance      Float     @default(0) // بدهکاری یا بستانکاری
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  invoices     Invoice[]
+}
+
+model Supplier {
+  id           String     @id @default(cuid())
+  name         String
+  phone        String?
+  email        String?
+  costCenterId String?
+  balance      Float      @default(0) // طلب تأمین‌کننده
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  purchases    Purchase[]
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  customerId      String?
+  customer        Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName    String
+  costCenterId    String?
+  costCenter      CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  date            DateTime
+  dueDate         DateTime?
+  totalAmount     Float
+  discount        Float         @default(0)
+  cogs            Float         @default(0) // بهای تمام شده
+  grossProfit     Float         @default(0) // سود ناخالص = فروش منهای cogs
+  amountPaid      Float         @default(0)
+  amountRemaining Float         @default(0)
+  status          String        @default("Paid") // Draft, Sent, Partial, Paid, Overdue, Cancelled
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  items           InvoiceItem[]
+  receivables     Receivable[]
+}
+
+model InvoiceItem {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  title     String
+  quantity  Int      @default(1)
+  unitPrice Float
+  unitCost  Float    @default(0)
+  total     Float
+  createdAt DateTime @default(now())
+}
+
+model Purchase {
+  id              String         @id @default(cuid())
+  purchaseNumber  String         @unique
+  supplierId      String?
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierName    String
+  costCenterId    String?
+  costCenter      CostCenter?    @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  date            DateTime
+  dueDate         DateTime?
+  totalAmount     Float
+  paidAmount      Float          @default(0)
+  remainingAmount Float          @default(0)
+  status          String         @default("Paid") // Pending, Partial, Paid
+  receipt         String?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  items           PurchaseItem[]
+  payables        Payable[]
+}
+
+model PurchaseItem {
+  id         String   @id @default(cuid())
+  purchaseId String
+  purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  title      String
+  quantity   Int      @default(1)
+  unitCost   Float
+  total      Float
+  createdAt  DateTime @default(now())
+}
+
+model Receivable {
+  id              String    @id @default(cuid())
+  debtorName      String
+  invoiceId       String?
+  invoice         Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  originalAmount  Float
+  paidAmount      Float     @default(0)
+  remainingAmount Float
+  dueDate         DateTime?
+  agingDays       Int       @default(0)
+  status          String    @default("pending") // pending, partial, settled, overdue
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Payable {
+  id              String    @id @default(cuid())
+  creditorName    String
+  purchaseId      String?
+  purchase        Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  originalAmount  Float
+  paidAmount      Float     @default(0)
+  remainingAmount Float
+  dueDate         DateTime?
+  agingDays       Int       @default(0)
+  status          String    @default("pending") // pending, partial, settled, overdue
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Debt {
+  id              String        @id @default(cuid())
+  creditor        String        // نام طلبکار یا بانک
+  originalAmount  Float
+  remainingAmount Float
+  interestRate    Float         @default(0) // درصد سود
+  minimumPayment  Float         @default(0)
+  dueDate         DateTime?
+  priority        Int           @default(1)
+  strategy        String        @default("Snowball") // Snowball (کمترین مانده اول), Avalanche (بیشترین بهره اول), Custom
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  payments        DebtPayment[]
+}
+
+model DebtPayment {
+  id        String   @id @default(cuid())
+  debtId    String
+  debt      Debt     @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  date      DateTime
+  amount    Float
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model BudgetLine {
+  id            String             @id @default(cuid())
+  year          Int
+  month         Int                // 1-12
+  categoryId    String?
+  category      FinancialCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  costCenterId  String?
+  costCenter    CostCenter?        @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  plannedAmount Float              @default(0)
+  actualAmount  Float              @default(0)
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([year, month, categoryId, costCenterId])
+}
+
+model SinkingFund {
+  id               String   @id @default(cuid())
+  name             String   // صندوق اضطراری، لپتاپ جدید، شهریه دانشگاه، مالیات
+  targetAmount     Float
+  savedAmount      Float    @default(0)
+  dueDate          DateTime?
+  contributionPlan String?  // ماهیانه ۲ میلیون تومان
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Asset {
+  id              String    @id @default(cuid())
+  name            String    // تجهیزات مغازه، کامپیوتر، موجودی نقد، سرمایه‌گذاری
+  type            String    // Current, Fixed, Investment
+  value           Float
+  acquisitionDate DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Liability {
+  id        String   @id @default(cuid())
+  name      String   // وام بلندمدت، بدهی تامین‌کننده، اسناد پرداختنی
+  type      String   // Current, LongTerm
+  amount    Float
+  dueDate   DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ShopCashRegister {
+  id                  String      @id @default(cuid())
+  date                DateTime
+  costCenterId        String?
+  costCenter          CostCenter? @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  openingCash         Float       @default(0) // موجودی آغاز روز (کف صندوق)
+  salesCash           Float       @default(0) // کل فروش نقدی روزانه
+  posSalesCash        Float       @default(0) // فروش کارتخوان / پوز
+  physicalSalesCash   Float       @default(0) // فروش اسکناس نقد فیزیکی
+  expensesCash        Float       @default(0) // هزینه‌های نقدی پرداختی از دخل
+  withdrawalsCash     Float       @default(0) // برداشت‌های شخصی از دخل
+  expectedClosingCash Float       @default(0) // موجودی انتظاری = آغاز + فروش - هزینه - برداشت
+  actualClosingCash   Float       @default(0) // موجودی شمارش شده واقعی پایان روز
+  difference          Float       @default(0) // کسری یا مازاد دخل (actual - expected)
+  reconciled          Boolean     @default(true) // آیا دخل بالانس و بدون کسری است؟
+  notes               String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@unique([date, costCenterId])
+}
+
+// =================== یادگیری و دانشگاه ===================
+
+model LearningSkill {
+  id             String   @id @default(cuid())
+  title          String
+  area           String   @default("توسعه فردی")
+  currentLevel   String   @default("مقدماتی") // مقدماتی، متوسط، پیشرفته، متخصص
+  targetLevel    String   @default("پیشرفته")
+  curriculum     String?  // سرفصل‌ها
+  practiceProject String? // پروژه عملی
+  hoursInvested  Float    @default(0)
+  targetHours    Float    @default(50)
+  kpi            String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model UniversityCourse {
+  id            String                 @id @default(cuid())
+  code          String                 @unique // e.g. CE101
+  title         String                 // e.g. ریاضی مهندسی، پایگاه داده
+  instructor    String?
+  credits       Int                    @default(3)
+  semester      String                 @default("ترم پاییز ۱۴۰۳")
+  targetGrade   Float                  @default(18)
+  actualGrade   Float?
+  deepWorkHours Float                  @default(0)
+  daysOfWeek    String?                // e.g. "شنبه، دوشنبه"
+  startTime     String?                // e.g. "08:00"
+  endTime       String?                // e.g. "10:00"
+  location      String?                // e.g. "دانشکده فنی - کلاس ۳۰۴"
+  notes         String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  assignments   UniversityAssignment[]
+  exams         UniversityExam[]
+  events        UniversityEvent[]
+}
+
+model UniversityAssignment {
+  id        String           @id @default(cuid())
+  courseId  String
+  course    UniversityCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime?
+  weight    Float            @default(20) // %
+  status    String           @default("pending") // pending, submitted, graded
+  score     Float?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model UniversityExam {
+  id        String           @id @default(cuid())
+  courseId  String
+  course    UniversityCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String           // میان‌ترم، پایان‌ترم
+  examDate  DateTime
+  room      String?
+  weight    Float            @default(40) // %
+  score     Float?
+  notes     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model UniversityEvent {
+  id        String           @id @default(cuid())
+  courseId  String
+  course    UniversityCourse @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String           // عنوان رویداد (تکلیف، ارائه، پروژه، امتحان، کوئیز، کلاس جبرانی)
+  type      String           @default("تکلیف") // تکلیف، امتحان، ارائه، پروژه، کوئیز، کلاس جبرانی، آزمایشگاه، سایر
+  dueDate   DateTime?        // موعد تحویل یا تاریخ برگزاری
+  time      String?          // ساعت برگزاری e.g. 10:30
+  location  String?          // آدرس کلاس یا محل برگزاری e.g. سالن همایش یا کلاس ۱۰۲
+  weight    Float            @default(0) // درصد نمره
+  priority  String           @default("medium") // high, medium, low
+  status    String           @default("pending") // pending, completed
+  notes     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model Book {
+  id          String   @id @default(cuid())
+  title       String
+  author      String
+  category    String   @default("فردی")
+  pages       Int      @default(200)
+  currentPage Int      @default(0)
+  status      String   @default("Learning") // ToLearn, Learning, Completed, Archived
+  rating      Int      @default(5)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// =================== پایگاه دانش، اسناد و تصمیمات ===================
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  category  String   @default("یادداشت") // یادداشت، سند، ایده، ژورنال
+  tags      String?
+  areaId    String?
+  area      Area?    @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DecisionLog {
+  id             String    @id @default(cuid())
+  decision       String
+  date           DateTime  @default(now())
+  context        String
+  options        String
+  chosenOption   String
+  why            String
+  expectedResult String?
+  actualResult   String?
+  lesson         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model SOP {
+  id             String   @id @default(cuid())
+  title          String   // روش اجرایی استاندارد e.g. فروش لنت، بستن مغازه، ثبت مالی، بازبینی هفتگی
+  domain         String   // لنت، مغازه، شخصی
+  trigger        String   // چه زمانی اجرا شود
+  steps          String   // گام‌ها (JSON یا متن تفکیک شده)
+  owner          String   @default("من")
+  relatedRoutine String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// =================== موتور قوانین و اتوماسیون ===================
+
+model AutomationRule {
+  id          String   @id @default(cuid())
+  title       String
+  ifEvent     String   // e.g. time_reached, sale_created, task_overdue, sleep_low
+  ifCondition String   // e.g. time = 22:00, sleep < 6h
+  thenAction  String   // e.g. show_night_routine, reduce_inventory, suggest_light_load
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  entity    String   // Transaction, Invoice, Task, etc.
+  entityId  String
+  action    String   // CREATE, UPDATE, DELETE, RECONCILE
+  changedBy String   @default("user")
+  details   String?  // JSON
+  createdAt DateTime @default(now())
+}

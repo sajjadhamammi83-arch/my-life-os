@@ -1,0 +1,13 @@
+--- a/scripts/test-adversarial-challenger.ts
++++ b/scripts/test-adversarial-challenger.ts
+@@ -450,8 +450,8 @@
+     // Assessment:
+     // Big 3: Should decrement back
+     const big3Decremented = (revAfterUncheck?.big3Completed ?? 0) === initialBig3;
+     // Objective / KR: Did it decrement?
+-    const krDecremented = krAfterUncheck!.currentValue < krAfterCheck!.currentValue;
+-    const objDecremented = objAfterUncheck!.currentValue < objAfterCheck!.currentValue;
++    const krDecremented = (krAfterUncheck?.currentValue ?? 0) < (krAfterCheck?.currentValue ?? 0);
++    const objDecremented = (objAfterUncheck?.currentValue ?? 0) < (objAfterCheck?.currentValue ?? 0);
+ 
+     if (!krDecremented || !objDecremented) {

@@ -1,0 +1,72 @@
+--- a/src/app/api/tasks/route.ts
++++ b/src/app/api/tasks/route.ts
+@@ -99,14 +99,18 @@
+     if (isCompleted !== undefined) {
+       dataToUpdate.status = isCompleted ? "completed" : "today";
+       dataToUpdate.completedAt = isCompleted ? new Date() : null;
+-      if (isCompleted) dataToUpdate.kanbanColumn = "Done";
++      if (isCompleted) {
++        dataToUpdate.kanbanColumn = "Done";
++      } else if (existingTask.kanbanColumn === "Done" && kanbanColumn === undefined) {
++        dataToUpdate.kanbanColumn = "Ready";
++      }
+     }
+ 
+-    const willBeCompleted = isCompleted === true || status === "completed" || kanbanColumn === "Done" || dataToUpdate.status === "completed";
++    const finalStatus = dataToUpdate.status !== undefined ? dataToUpdate.status : existingTask.status;
++    const finalKanban = dataToUpdate.kanbanColumn !== undefined ? dataToUpdate.kanbanColumn : existingTask.kanbanColumn;
++    const willBeCompleted = finalStatus === "completed" || finalKanban === "Done";
+     const wasCompleted = existingTask.status === "completed" || existingTask.kanbanColumn === "Done";
+ 
+-    // 1. Goals Feedback Loop: When task is marked completed
++    // 1. Goals Feedback Loop: When task is marked completed or uncompleted
+     if (willBeCompleted && !wasCompleted && existingTask.objectiveId) {
+       try {
+         const obj = await prisma.objective.findUnique({
+@@ -144,6 +148,45 @@
+       } catch (err) {
+         console.error("Objective feedback loop error:", err);
+       }
++    } else if (!willBeCompleted && wasCompleted && existingTask.objectiveId) {
++      try {
++        const obj = await prisma.objective.findUnique({
++          where: { id: existingTask.objectiveId },
++          include: { keyResults: true },
++        });
++        if (obj) {
++          if (obj.keyResults && obj.keyResults.length > 0) {
++            const firstKr = obj.keyResults[0];
++            const span = firstKr.target - firstKr.baseline;
++            const step = span > 0 ? Math.max(1, Math.round(span / 10)) : 1;
++            const floorKrVal = Math.min(firstKr.baseline, firstKr.target);
++            const newKrVal = Math.max(floorKrVal, (firstKr.currentValue || 0) - step);
++            const newKrProg = calculateProgress(firstKr.baseline, firstKr.target, newKrVal);
++
++            await prisma.keyResult.update({
++              where: { id: firstKr.id },
++              data: { currentValue: newKrVal, progress: newKrProg },
++            });
++
++            const allKrs = await prisma.keyResult.findMany({ where: { objectiveId: obj.id } });
++            const avgProg = Math.round(allKrs.reduce((acc, k) => acc + k.progress, 0) / (allKrs.length || 1));
++            const newObjCur = Math.max(0, (obj.currentValue || 0) - 1);
++            await prisma.objective.update({
++              where: { id: obj.id },
++              data: { progress: avgProg, currentValue: newObjCur },
++            });
++          } else {
++            const tgt = obj.targetValue || 100;
++            const newCur = Math.max(0, (obj.currentValue || 0) - 1);
++            const newProg = calculateProgress(0, tgt, newCur);
++            await prisma.objective.update({
++              where: { id: obj.id },
++              data: { currentValue: newCur, progress: newProg },
++            });
++          }
++        }
++      } catch (err) {
++        console.error("Objective rollback error:", err);
++      }
+     }
+ 
+     // 2. Big 3 Feedback Loop: When Big 3 task is completed
