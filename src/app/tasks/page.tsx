@@ -17,6 +17,15 @@ import {
   Zap,
 } from "lucide-react";
 import { toPersianDigits } from "@/lib/utils";
+import {
+  getLocalTasks,
+  saveLocalTasks,
+  createLocalTask,
+  toggleLocalTask as dbToggleLocalTask,
+  toggleLocalBigThree as dbToggleLocalBigThree,
+  deleteLocalTask as dbDeleteLocalTask,
+  queueOfflineMutation,
+} from "@/lib/pwa/local-store";
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -33,11 +42,31 @@ export default function TasksPage() {
     try {
       const res = await fetch("/api/tasks");
       const data = await res.json();
-      if (data.success) setTasks(data.tasks);
+      if (data.success && Array.isArray(data.tasks)) {
+        await saveLocalTasks(data.tasks);
+        setTasks(data.tasks);
+      }
     } catch (e) {
-      console.error(e);
+      console.error("fetchTasks failed, relying on local store:", e);
     }
   };
+
+  // 1. Initial hydration from IndexedDB before network fetch
+  useEffect(() => {
+    let mounted = true;
+    getLocalTasks()
+      .then((local) => {
+        if (!mounted) return;
+        if (local && local.length > 0) {
+          setTasks(local);
+        }
+      })
+      .catch((err) => console.error("Error hydrating tasks from IndexedDB:", err));
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchTasks();
@@ -48,23 +77,25 @@ export default function TasksPage() {
     if (!title.trim()) return;
     setIsSubmitting(true);
 
-    try {
-      const priority =
-        quadrant === "Q1" ? "urgent" : quadrant === "Q2" ? "high" : quadrant === "Q3" ? "medium" : "low";
+    const priority =
+      quadrant === "Q1" ? "urgent" : quadrant === "Q2" ? "high" : quadrant === "Q3" ? "medium" : "low";
 
+    const payload = {
+      title: title.trim(),
+      areaId: areaId || undefined,
+      eisenhowerQuadrant: quadrant,
+      workType,
+      estimatedMinutes: Number(estimatedMinutes),
+      priority,
+      isBigThree,
+      status: "today",
+    };
+
+    try {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          areaId: areaId || undefined,
-          eisenhowerQuadrant: quadrant,
-          workType,
-          estimatedMinutes: Number(estimatedMinutes),
-          priority,
-          isBigThree,
-          status: "today",
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -72,7 +103,16 @@ export default function TasksPage() {
         setIsModalOpen(false);
         fetchTasks();
         window.dispatchEvent(new Event("reminders-updated"));
+      } else {
+        throw new Error(`Server returned status ${res.status}`);
       }
+    } catch (err) {
+      console.warn("Failed to create task online, saving locally to IndexedDB & queueing in outbox:", err);
+      const localTask = await createLocalTask(payload, true);
+      setTasks((prev) => [localTask, ...prev]);
+      setTitle("");
+      setIsModalOpen(false);
+      window.dispatchEvent(new Event("reminders-updated"));
     } finally {
       setIsSubmitting(false);
     }
@@ -80,21 +120,27 @@ export default function TasksPage() {
 
   const toggleTask = async (task: any) => {
     const isCompleted = task.status !== "completed";
+    const nextStatus = isCompleted ? "completed" : "today";
     setTasks(
       tasks.map((t) =>
-        t.id === task.id ? { ...t, status: isCompleted ? "completed" : "today" } : t
+        t.id === task.id ? { ...t, status: nextStatus } : t
       )
     );
 
+    // Persist change to IndexedDB immediately
+    await dbToggleLocalTask(task.id, isCompleted, false);
+
     try {
-      await fetch("/api/tasks", {
+      const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: task.id, isCompleted }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       window.dispatchEvent(new Event("reminders-updated"));
     } catch (e) {
-      console.error(e);
+      console.warn("Network failed in toggleTask, queued in outbox:", e);
+      await queueOfflineMutation("/api/tasks", "PATCH", { id: task.id, isCompleted }, task.id, "tasks");
     }
   };
 
@@ -103,16 +149,20 @@ export default function TasksPage() {
     const nextVal = !task.isBigThree;
     setTasks(tasks.map((t) => (t.id === task.id ? { ...t, isBigThree: nextVal } : t)));
 
+    // Persist change to IndexedDB immediately
+    await dbToggleLocalBigThree(task.id, nextVal, false);
+
     try {
-      await fetch("/api/tasks", {
+      const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: task.id, isBigThree: nextVal }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       window.dispatchEvent(new Event("reminders-updated"));
     } catch (e) {
-      console.error(e);
-      fetchTasks();
+      console.warn("Network failed in toggleBigThree, queued in outbox:", e);
+      await queueOfflineMutation("/api/tasks", "PATCH", { id: task.id, isBigThree: nextVal }, task.id, "tasks");
     }
   };
 
@@ -121,12 +171,16 @@ export default function TasksPage() {
     if (!confirm("آیا از حذف این تسک اطمینان دارید؟")) return;
     setTasks(tasks.filter((t) => t.id !== id));
 
+    // Persist change to IndexedDB immediately
+    await dbDeleteLocalTask(id, false);
+
     try {
-      await fetch(`/api/tasks?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/tasks?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       window.dispatchEvent(new Event("reminders-updated"));
     } catch (e) {
-      console.error(e);
-      fetchTasks();
+      console.warn("Network failed in deleteTask, queued in outbox:", e);
+      await queueOfflineMutation(`/api/tasks?id=${id}`, "DELETE", null, id, "tasks");
     }
   };
 

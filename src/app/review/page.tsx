@@ -31,6 +31,13 @@ import {
   Filter,
 } from "lucide-react";
 import { toPersianDigits, formatPersianDate } from "@/lib/utils";
+import {
+  getLocalReviews,
+  saveLocalReviews,
+  saveLocalReview,
+  deleteLocalReview as dbDeleteLocalReview,
+  queueOfflineMutation,
+} from "@/lib/pwa/local-store";
 
 interface ReviewQuestion {
   id: string;
@@ -121,16 +128,36 @@ export default function ReviewPage() {
       const res = await fetch("/api/reviews");
       const data = await res.json();
       if (data.success) {
-        setReviews(data.reviews || []);
+        if (data.reviews && Array.isArray(data.reviews)) {
+          await saveLocalReviews(data.reviews);
+          setReviews(data.reviews);
+        }
         setQuestions(data.questions || []);
         setAutomatedStats(data.automatedTodayStats || {});
       }
     } catch (e) {
-      console.error(e);
+      console.error("fetchData failed, relying on local store:", e);
     } finally {
       setLoading(false);
     }
   };
+
+  // 1. Initial hydration from IndexedDB before network fetch
+  useEffect(() => {
+    let mounted = true;
+    getLocalReviews()
+      .then((local) => {
+        if (!mounted) return;
+        if (local && local.length > 0) {
+          setReviews(local);
+        }
+      })
+      .catch((err) => console.error("Error hydrating reviews from IndexedDB:", err));
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -201,38 +228,50 @@ export default function ReviewPage() {
     e.preventDefault();
     setIsSubmitting(true);
 
+    const reviewPayload = {
+      id: isEditMode ? editingReviewId : undefined,
+      date: formDate,
+      big3Completed: Number(formBig3),
+      productivityScore: Number(formProductivity),
+      mood: formMood,
+      deepWorkHours: Number(formDeepWork),
+      energyPhysical: Number(formPhys),
+      energyEmotional: Number(formEmot),
+      energyMental: Number(formMent),
+      energySpiritual: Number(formSpir),
+      whatWentWell: formWhatWentWell,
+      whatFailed: formWhatFailed,
+      bottleneck: formBottleneck,
+      lessonsLearned: formLessons,
+      tomorrowChanges: formTomorrowChanges,
+      gratitude: formGratitude,
+      keyInsight: formKeyInsight,
+      customAnswers: customAnswersMap,
+    };
+
     try {
-      await fetch("/api/reviews", {
+      const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: isEditMode ? editingReviewId : undefined,
-          date: formDate,
-          big3Completed: Number(formBig3),
-          productivityScore: Number(formProductivity),
-          mood: formMood,
-          deepWorkHours: Number(formDeepWork),
-          energyPhysical: Number(formPhys),
-          energyEmotional: Number(formEmot),
-          energyMental: Number(formMent),
-          energySpiritual: Number(formSpir),
-          whatWentWell: formWhatWentWell,
-          whatFailed: formWhatFailed,
-          bottleneck: formBottleneck,
-          lessonsLearned: formLessons,
-          tomorrowChanges: formTomorrowChanges,
-          gratitude: formGratitude,
-          keyInsight: formKeyInsight,
-          customAnswers: customAnswersMap,
-        }),
+        body: JSON.stringify(reviewPayload),
       });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       setStatusMsg("ارزیابی روزانه با موفقیت ثبت و همگام شد ✓");
       setIsReviewModalOpen(false);
       fetchData();
       setTimeout(() => setStatusMsg(""), 3500);
     } catch (e) {
-      console.error(e);
+      console.warn("Network error saving review, saving locally to IndexedDB & queueing in outbox:", e);
+      const localReview = await saveLocalReview(reviewPayload, true);
+      setReviews((prev) => {
+        const filtered = prev.filter((r) => r.id !== localReview.id && r.date !== localReview.date);
+        return [localReview, ...filtered];
+      });
+      setStatusMsg("ارزیابی در حافظه محلی ذخیره شد و در صف همگام‌سازی قرار گرفت ✓");
+      setIsReviewModalOpen(false);
+      setTimeout(() => setStatusMsg(""), 3500);
     } finally {
       setIsSubmitting(false);
     }
@@ -241,11 +280,16 @@ export default function ReviewPage() {
   // Delete Review
   const handleDeleteReview = async (id: string) => {
     if (!confirm("آیا از حذف این گزارش ارزیابی روزانه اطمینان دارید؟")) return;
+    setReviews((prev) => prev.filter((r) => r.id !== id));
+    await dbDeleteLocalReview(id, false);
+
     try {
-      await fetch(`/api/reviews?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/reviews?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       fetchData();
     } catch (e) {
-      console.error(e);
+      console.warn("Network error deleting review, queued in outbox:", e);
+      await queueOfflineMutation(`/api/reviews?id=${encodeURIComponent(id)}`, "DELETE", null, id, "daily_reviews");
     }
   };
 

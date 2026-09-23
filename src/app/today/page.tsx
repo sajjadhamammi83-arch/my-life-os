@@ -28,6 +28,18 @@ import Link from "next/link";
 import { toPersianDigits, formatCurrency } from "@/lib/utils";
 import TomorrowAgendaWidget from "@/components/dashboard/TomorrowAgendaWidget";
 import DailyGoalRecoveryWidget from "@/components/goals/DailyGoalRecoveryWidget";
+import {
+  getLocalTodayData,
+  saveLocalTasks,
+  saveLocalHabits,
+  saveLocalCalendarBlocks,
+  createLocalTask,
+  toggleLocalTask as dbToggleLocalTask,
+  toggleLocalHabit as dbToggleLocalHabit,
+  toggleLocalBigThree as dbToggleLocalBigThree,
+  deleteLocalTask as dbDeleteLocalTask,
+  queueOfflineMutation,
+} from "@/lib/pwa/local-store";
 
 // Quadrant Color Definitions & Helpers
 function getQuadrantMeta(quadrant?: string, priority?: string) {
@@ -135,12 +147,13 @@ export default function TodayPage() {
     try {
       const res = await fetch("/api/tasks");
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.tasks)) {
+        await saveLocalTasks(data.tasks);
         // Fetch all today tasks and big three tasks
         setTasks(data.tasks.filter((t: any) => (t.status === "today" || t.isBigThree) && t.status !== "scheduled"));
       }
     } catch (e) {
-      console.error(e);
+      console.error("fetchTasks failed, relying on local store:", e);
     }
   };
 
@@ -148,9 +161,12 @@ export default function TodayPage() {
     try {
       const res = await fetch("/api/habits");
       const data = await res.json();
-      if (data.success) setHabits(data.habits);
+      if (data.success && Array.isArray(data.habits)) {
+        await saveLocalHabits(data.habits);
+        setHabits(data.habits);
+      }
     } catch (e) {
-      console.error(e);
+      console.error("fetchHabits failed, relying on local store:", e);
     }
   };
 
@@ -163,12 +179,36 @@ export default function TodayPage() {
       const res = await fetch(`/api/calendar?date=${yyyy}-${mm}-${dd}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.blocks)) {
+        await saveLocalCalendarBlocks(data.blocks);
         setCalendarBlocks(data.blocks);
       }
     } catch (e) {
       console.error("Error loading today calendar blocks:", e);
     }
   };
+
+  // 1. Initial hydration from IndexedDB before network fetch
+  useEffect(() => {
+    let mounted = true;
+    getLocalTodayData()
+      .then((local) => {
+        if (!mounted) return;
+        if (local.tasks && local.tasks.length > 0) {
+          setTasks(local.tasks);
+        }
+        if (local.habits && local.habits.length > 0) {
+          setHabits(local.habits);
+        }
+        if (local.calendarBlocks && local.calendarBlocks.length > 0) {
+          setCalendarBlocks(local.calendarBlocks);
+        }
+      })
+      .catch((err) => console.error("Error hydrating today from IndexedDB:", err));
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchTasks();
@@ -188,19 +228,25 @@ export default function TodayPage() {
 
   const toggleTask = async (task: any) => {
     const isCompleted = task.status !== "completed";
+    const nextStatus = isCompleted ? "completed" : "today";
     setTasks(
-      tasks.map((t) => (t.id === task.id ? { ...t, status: isCompleted ? "completed" : "today" } : t))
+      tasks.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t))
     );
 
+    // Persist change to IndexedDB immediately
+    await dbToggleLocalTask(task.id, isCompleted, false);
+
     try {
-      await fetch("/api/tasks", {
+      const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: task.id, isCompleted }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       window.dispatchEvent(new Event("reminders-updated"));
     } catch (e) {
-      console.error(e);
+      console.warn("Network failed in toggleTask, queued in outbox:", e);
+      await queueOfflineMutation("/api/tasks", "PATCH", { id: task.id, isCompleted }, task.id, "tasks");
     }
   };
 
@@ -209,16 +255,20 @@ export default function TodayPage() {
     const nextVal = !task.isBigThree;
     setTasks(tasks.map((t) => (t.id === task.id ? { ...t, isBigThree: nextVal } : t)));
 
+    // Persist change to IndexedDB immediately
+    await dbToggleLocalBigThree(task.id, nextVal, false);
+
     try {
-      await fetch("/api/tasks", {
+      const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: task.id, isBigThree: nextVal }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       window.dispatchEvent(new Event("reminders-updated"));
     } catch (e) {
-      console.error(e);
-      fetchTasks();
+      console.warn("Network failed in toggleBigThree, queued in outbox:", e);
+      await queueOfflineMutation("/api/tasks", "PATCH", { id: task.id, isBigThree: nextVal }, task.id, "tasks");
     }
   };
 
@@ -227,12 +277,16 @@ export default function TodayPage() {
     if (!confirm("آیا از حذف این تسک اطمینان دارید؟")) return;
     setTasks(tasks.filter((t) => t.id !== taskId));
 
+    // Persist change to IndexedDB immediately
+    await dbDeleteLocalTask(taskId, false);
+
     try {
-      await fetch(`/api/tasks?id=${taskId}`, { method: "DELETE" });
+      const res = await fetch(`/api/tasks?id=${taskId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       window.dispatchEvent(new Event("reminders-updated"));
     } catch (e) {
-      console.error(e);
-      fetchTasks();
+      console.warn("Network failed in deleteTask, queued in outbox:", e);
+      await queueOfflineMutation(`/api/tasks?id=${taskId}`, "DELETE", null, taskId, "tasks");
     }
   };
 
@@ -241,35 +295,45 @@ export default function TodayPage() {
     if (!newTaskTitle.trim()) return;
     setIsAddingTask(true);
 
-    try {
-      const mappedPriority =
-        selectedQuadrant === "Q1"
-          ? "urgent"
-          : selectedQuadrant === "Q2"
-          ? "high"
-          : selectedQuadrant === "Q3"
-          ? "medium"
-          : "low";
+    const mappedPriority =
+      selectedQuadrant === "Q1"
+        ? "urgent"
+        : selectedQuadrant === "Q2"
+        ? "high"
+        : selectedQuadrant === "Q3"
+        ? "medium"
+        : "low";
 
+    const payload = {
+      title: newTaskTitle.trim(),
+      status: "today",
+      isBigThree: isBigThreeChoice,
+      eisenhowerQuadrant: selectedQuadrant,
+      priority: mappedPriority,
+      workType: selectedWorkType,
+      estimatedMinutes: Number(estimatedMins) || 30,
+    };
+
+    try {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTaskTitle.trim(),
-          status: "today",
-          isBigThree: isBigThreeChoice,
-          eisenhowerQuadrant: selectedQuadrant,
-          priority: mappedPriority,
-          workType: selectedWorkType,
-          estimatedMinutes: Number(estimatedMins) || 30,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         setNewTaskTitle("");
         await fetchTasks();
         window.dispatchEvent(new Event("reminders-updated"));
+      } else {
+        throw new Error(`Server status ${res.status}`);
       }
+    } catch (err) {
+      console.warn("Failed to create task online, saving locally to IndexedDB & queueing in outbox:", err);
+      const localTask = await createLocalTask(payload, true);
+      setTasks((prev) => [localTask, ...prev]);
+      setNewTaskTitle("");
+      window.dispatchEvent(new Event("reminders-updated"));
     } finally {
       setIsAddingTask(false);
     }
@@ -290,26 +354,32 @@ export default function TodayPage() {
 
   const toggleHabit = async (habit: any) => {
     const nextCompleted = !habit.todayDone;
+    const nextStreak = nextCompleted ? habit.streak + 1 : Math.max(0, habit.streak - 1);
     setHabits(
       habits.map((h) =>
         h.id === habit.id
           ? {
               ...h,
               todayDone: nextCompleted,
-              streak: nextCompleted ? h.streak + 1 : Math.max(0, h.streak - 1),
+              streak: nextStreak,
             }
           : h
       )
     );
 
+    // Persist change to IndexedDB immediately
+    await dbToggleLocalHabit(habit.id, nextCompleted, false);
+
     try {
-      await fetch("/api/habits", {
+      const res = await fetch("/api/habits", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ habitId: habit.id, completed: nextCompleted }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
-      console.error(e);
+      console.warn("Network failed in toggleHabit, queued in outbox:", e);
+      await queueOfflineMutation("/api/habits", "PATCH", { habitId: habit.id, completed: nextCompleted }, habit.id, "habits");
     }
   };
 

@@ -29,6 +29,14 @@ import {
   Filter,
 } from "lucide-react";
 import { formatCurrency, toPersianDigits, formatPersianDate } from "@/lib/utils";
+import {
+  getLocalFinanceData,
+  saveLocalFinanceData,
+  saveLocalCashRegister,
+  saveLocalExpense,
+  saveLocalTransaction,
+  queueOfflineMutation,
+} from "@/lib/pwa/local-store";
 
 const CHEQUE_STATUS_MAP: Record<string, { label: string; badge: string; color: string }> = {
   PENDING: { label: "⏳ معوق (در انتظار)", badge: "bg-amber-50 text-amber-800 border-amber-200", color: "text-amber-600" },
@@ -181,6 +189,9 @@ export default function FinancePage() {
         setTransactions(data.transactions || []);
         setCashRegisters(data.cashRegisters || []);
 
+        // Persist fresh finance snapshot to IndexedDB
+        await saveLocalFinanceData(data);
+
         if (data.accounts.length > 0 && !expenseForm.bankAccountId) {
           setExpenseForm((prev) => ({
             ...prev,
@@ -205,11 +216,35 @@ export default function FinancePage() {
         }
       }
     } catch (e) {
-      console.error(e);
+      console.error("fetchData failed, relying on local store:", e);
     } finally {
       setLoading(false);
     }
   };
+
+  // 1. Initial hydration from IndexedDB before network fetch
+  useEffect(() => {
+    let mounted = true;
+    getLocalFinanceData()
+      .then((local) => {
+        if (!mounted) return;
+        if (local) {
+          if (local.summary && Object.keys(local.summary).length > 0) setSummary(local.summary);
+          if (local.costCenters && local.costCenters.length > 0) setCostCenters(local.costCenters);
+          if (local.accounts && local.accounts.length > 0) setAccounts(local.accounts);
+          if (local.expenses && local.expenses.length > 0) setExpenses(local.expenses);
+          if (local.fixedExpenses && local.fixedExpenses.length > 0) setFixedExpenses(local.fixedExpenses);
+          if (local.cheques && local.cheques.length > 0) setCheques(local.cheques);
+          if (local.transactions && local.transactions.length > 0) setTransactions(local.transactions);
+          if (local.cashRegisters && local.cashRegisters.length > 0) setCashRegisters(local.cashRegisters);
+        }
+      })
+      .catch((err) => console.error("Error hydrating finance from IndexedDB:", err));
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -221,21 +256,25 @@ export default function FinancePage() {
     if (!expenseForm.title.trim() || !expenseForm.amount) return;
     setIsSubmitting(true);
 
+    const expensePayload = {
+      type: "expense",
+      title: expenseForm.title.trim(),
+      categoryName: expenseForm.category,
+      amount: Number(expenseForm.amount),
+      bankAccountId: expenseForm.bankAccountId || null,
+      costCenterId: expenseForm.costCenterId || null,
+      paymentMethod: expenseForm.paymentMethod,
+      description: expenseForm.description,
+    };
+
     try {
-      await fetch("/api/finance/accounting", {
+      const res = await fetch("/api/finance/accounting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "expense",
-          title: expenseForm.title.trim(),
-          categoryName: expenseForm.category,
-          amount: Number(expenseForm.amount),
-          bankAccountId: expenseForm.bankAccountId || null,
-          costCenterId: expenseForm.costCenterId || null,
-          paymentMethod: expenseForm.paymentMethod,
-          description: expenseForm.description,
-        }),
+        body: JSON.stringify(expensePayload),
       });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       setIsExpenseModalOpen(false);
       setExpenseForm({
@@ -249,7 +288,20 @@ export default function FinancePage() {
       });
       fetchData();
     } catch (err) {
-      console.error(err);
+      console.warn("Network error saving expense, saving locally to IndexedDB & queueing in outbox:", err);
+      const localRecord = await saveLocalExpense(expensePayload, true);
+      setExpenses((prev) => [localRecord, ...prev]);
+      setTransactions((prev) => [localRecord, ...prev]);
+      setIsExpenseModalOpen(false);
+      setExpenseForm({
+        title: "",
+        category: EXPENSE_CATEGORIES[0],
+        amount: "",
+        paymentMethod: "کارت / انتقال",
+        bankAccountId: accounts[0]?.id || "",
+        costCenterId: costCenters[0]?.id || "",
+        description: "",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -435,18 +487,22 @@ export default function FinancePage() {
     if (!transferForm.fromAccountId || !transferForm.toAccountId || !transferForm.amount) return;
     setIsSubmitting(true);
 
+    const transferPayload = {
+      type: "transfer",
+      fromAccountId: transferForm.fromAccountId,
+      toAccountId: transferForm.toAccountId,
+      amount: Number(transferForm.amount),
+      description: transferForm.description,
+    };
+
     try {
-      await fetch("/api/finance/accounting", {
+      const res = await fetch("/api/finance/accounting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "transfer",
-          fromAccountId: transferForm.fromAccountId,
-          toAccountId: transferForm.toAccountId,
-          amount: Number(transferForm.amount),
-          description: transferForm.description,
-        }),
+        body: JSON.stringify(transferPayload),
       });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       setIsTransferModalOpen(false);
       setTransferForm({
@@ -457,7 +513,16 @@ export default function FinancePage() {
       });
       fetchData();
     } catch (err) {
-      console.error(err);
+      console.warn("Network error during transfer, saving locally to IndexedDB & queueing in outbox:", err);
+      const localRecord = await saveLocalTransaction(transferPayload, true);
+      setTransactions((prev) => [localRecord, ...prev]);
+      setIsTransferModalOpen(false);
+      setTransferForm({
+        fromAccountId: accounts[0]?.id || "",
+        toAccountId: accounts[1]?.id || accounts[0]?.id || "",
+        amount: "",
+        description: "",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -468,28 +533,35 @@ export default function FinancePage() {
     e.preventDefault();
     setIsSubmitting(true);
 
+    const crPayload = {
+      type: "cash_register",
+      costCenterId: crForm.costCenterId || null,
+      openingCash: Number(crForm.openingCash) || 0,
+      salesCash: Number(crForm.salesCash) || 0,
+      posSalesCash: Number(crForm.posSalesCash) || 0,
+      physicalSalesCash: Number(crForm.physicalSalesCash) || 0,
+      expensesCash: Number(crForm.expensesCash) || 0,
+      withdrawalsCash: Number(crForm.withdrawalsCash) || 0,
+      actualClosingCash: Number(crForm.actualClosingCash) || 0,
+      notes: crForm.notes,
+    };
+
     try {
-      await fetch("/api/finance/accounting", {
+      const res = await fetch("/api/finance/accounting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "cash_register",
-          costCenterId: crForm.costCenterId || null,
-          openingCash: Number(crForm.openingCash) || 0,
-          salesCash: Number(crForm.salesCash) || 0,
-          posSalesCash: Number(crForm.posSalesCash) || 0,
-          physicalSalesCash: Number(crForm.physicalSalesCash) || 0,
-          expensesCash: Number(crForm.expensesCash) || 0,
-          withdrawalsCash: Number(crForm.withdrawalsCash) || 0,
-          actualClosingCash: Number(crForm.actualClosingCash) || 0,
-          notes: crForm.notes,
-        }),
+        body: JSON.stringify(crPayload),
       });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       setIsCashRegisterModalOpen(false);
       fetchData();
     } catch (err) {
-      console.error(err);
+      console.warn("Network error saving cash register, saving locally to IndexedDB & queueing in outbox:", err);
+      const localRecord = await saveLocalCashRegister(crPayload, true);
+      setCashRegisters((prev) => [localRecord, ...prev]);
+      setIsCashRegisterModalOpen(false);
     } finally {
       setIsSubmitting(false);
     }

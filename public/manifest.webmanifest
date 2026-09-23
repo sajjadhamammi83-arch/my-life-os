@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "id": "/?source=pwa",
+  "name": "Life OS — سیستم‌عامل جامع مدیریت زندگی و حسابداری",
+  "short_name": "Life OS",
+  "description": "مرکز فرماندهی یکپارچه برای مدیریت اهداف، زمان، سلامت، یادگیری، پروژه‌ها و حسابداری کامل دوبل/مالی",
+  "start_url": "/today?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "window-controls-overlay",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "lang": "fa-IR",
+  "dir": "rtl",
+  "categories": [
+    "productivity",
+    "finance",
+    "lifestyle",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "اقدامات امروز",
+      "short_name": "امروز",
+      "description": "مشاهده اقدامات سه گانه طلایی و بلوک‌های زمانی امروز",
+      "url": "/today?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "پیشخوان فرماندهی",
+      "short_name": "پیشخوان",
+      "description": "مرکز کنترل و شاخص‌های کلیدی زندگی",
+      "url": "/dashboard?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "مالی و حسابداری",
+      "short_name": "مالی",
+      "description": "ثبت سریع تراکنش‌ها و دخل صندوق",
+      "url": "/finance?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "ماتریس وظایف",
+      "short_name": "وظایف",
+      "description": "مدیریت تسک‌ها در ماتریس آیزنهاور",
+      "url": "/tasks?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

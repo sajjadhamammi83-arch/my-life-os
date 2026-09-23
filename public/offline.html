@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>حالت آفلاین | Life OS</title>
+  <meta name="theme-color" content="#ffffff">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #ffffff;
+      color: #09090b;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: max(2rem, env(safe-area-inset-top, 0px)) 1.5rem max(2rem, env(safe-area-inset-bottom, 0px));
+      text-align: center;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .badge {
+      width: 72px;
+      height: 72px;
+      background-color: #09090b;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    }
+    .badge svg {
+      width: 36px;
+      height: 36px;
+      stroke: #ffffff;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    p {
+      font-size: 0.875rem;
+      color: #71717a;
+      line-height: 1.6;
+      max-width: 320px;
+      margin-bottom: 2rem;
+    }
+    .btn {
+      background-color: #09090b;
+      color: #ffffff;
+      font-size: 0.875rem;
+      font-weight: 700;
+      padding: 0.75rem 2rem;
+      border-radius: 9999px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: transform 0.1s ease, background-color 0.2s ease;
+    }
+    .btn:active {
+      transform: scale(0.96);
+      background-color: #27272a;
+    }
+    .status-pill {
+      margin-top: 1.75rem;
+      font-size: 0.75rem;
+      color: #71717a;
+      background-color: #f4f4f5;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: #f59e0b;
+      animation: pulse 2s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+  </style>
+</head>
+<body>
+  <div class="badge">
+    <svg viewBox="0 0 24 24">
+      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+      <polyline points="2 17 12 22 22 17"></polyline>
+      <polyline points="2 12 12 17 22 12"></polyline>
+    </svg>
+  </div>
+  <h1>حالت آفلاین محلی</h1>
+  <p>ارتباط با سرور برقرار نیست، اما ساختار Life OS در حافظه دستگاه شما فعال است. داده‌های محلی محافظت شده‌اند.</p>
+  <button class="btn" onclick="window.location.reload()">تلاش مجدد اتصال</button>
+  <div class="status-pill">
+    <span class="status-dot"></span>
+    <span>همگام‌سازی محلی (Local-First Active)</span>
+  </div>
+</body>
+</html>

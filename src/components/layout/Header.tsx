@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Plus, Calendar, Bell, ShieldCheck, Sparkles, Clock, CheckSquare, Dumbbell, ArrowLeft, X, Receipt, GraduationCap } from "lucide-react";
 import { getTodayPersianString, toPersianDigits, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
+import SyncStatusBadge from "@/components/pwa/SyncStatusBadge";
 
 interface HeaderProps {
   onOpenQuickCapture: () => void;
@@ -68,7 +69,7 @@ export default function Header({ onOpenQuickCapture }: HeaderProps) {
   const totalTomorrowCount = reminderData?.summary?.totalItems || 0;
 
   return (
-    <header className="h-16 border-b border-zinc-200 bg-white/90 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="h-[calc(4rem+env(safe-area-inset-top,0px))] border-b border-zinc-200 bg-white/90 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30 pt-[env(safe-area-inset-top)] sticky-header">
       {/* Left: Today Info & Phase */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 text-zinc-600 text-xs">
@@ -96,6 +97,9 @@ export default function Header({ onOpenQuickCapture }: HeaderProps) {
             Ctrl+K
           </kbd>
         </button>
+
+        {/* PWA Offline/Online Sync Status */}
+        <SyncStatusBadge />
 
         {/* Audit Status */}
         <div className="flex items-center gap-1.5 text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg">

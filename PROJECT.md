@@ -1,129 +1,132 @@
-# Project: Life OS Comprehensive Cross-Module Integration & Universal E2E Test Suite
+# Project: Life OS PWA Local-First Transformation & Universal Mobile Architecture
 
 ## Architecture
 - Framework: Next.js 14.2.16 (App Router) with React 18 & TypeScript 5.6
-- ORM & Database: Prisma 5.22.0 with SQLite (`prisma/dev.db`)
-- Styling: Tailwind CSS 3.4, Vazirmatn font, Minimal Pure White (`#ffffff`) theme
-- Server: Port 3050 strictly enforced (`next dev -p 3050`); Port 3000 strictly isolated (user cafe platform, PID 8600)
-- Core System Modules:
-  - Header Bell & D-1 Reminders (`src/components/layout/Header.tsx`, `/api/reminders/tomorrow`)
-  - Dashboard Page & API (`src/app/dashboard/page.tsx`, `src/app/api/dashboard/route.ts`)
-  - Today Page & API (`src/app/today/page.tsx`, `src/app/api/today/route.ts`)
-  - Goals & OKRs (`src/app/goals/page.tsx`, `src/app/api/goals/route.ts`, `src/app/api/goals/daily-dispatcher/route.ts`)
-  - Tasks & Rollover (`src/app/tasks/page.tsx`, `src/app/api/tasks/route.ts`)
-  - Planner & Calendar (`src/app/planner/page.tsx`, `src/app/api/planner/route.ts`, `src/app/api/calendar/route.ts`)
-  - Learning & University (`src/app/learning/page.tsx`, `src/app/api/learning/route.ts`)
-  - Finance & Accounting (`src/app/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/api/finance/accounting/route.ts`, `src/app/api/finance/cash-register/route.ts`)
-  - Reviews & Energy (`src/app/review/page.tsx`, `src/app/api/reviews/route.ts`, `src/app/api/reviews/daily/route.ts`)
-  - Analytics & Reports (`src/app/analytics/page.tsx`, `src/app/api/analytics/route.ts`)
+- Database: Prisma 5.22.0 with SQLite (`prisma/dev.db`) on server
+- Client-Side Persistence: Native IndexedDB (`LifeOS_LocalDB`) with 10 object stores
+- PWA & iOS Safari Native Integration:
+  - W3C Web App Manifest (`public/manifest.webmanifest`, `public/manifest.json`)
+  - iOS Safari standalone tags (`apple-mobile-web-app-capable`, `apple-touch-icon`, `viewport-fit=cover`)
+  - Dedicated Service Worker (`public/sw.js`) with 5 isolated caching tiers (Stale-While-Revalidate, Cache-First, Network-First, Mutation Passthrough, Offline Shell)
+  - Offline Fallback Shell (`public/offline.html`)
+  - Registration component (`src/components/pwa/ServiceWorkerRegister.tsx`)
+- Offline-to-Online Sync Engine:
+  - Outbox Queue (`outbox_queue` in IndexedDB) with FIFO chronological replay
+  - Two-layer connectivity monitor (`navigator.onLine` + `/api/ping` lightweight heartbeat)
+  - Mutual exclusion sync lock, `X-Idempotency-Key`, and temporary ID remapping
+  - Header Connectivity & Sync Indicator in `src/components/layout/Header.tsx` (3 visual states with Persian digits)
+- Ports:
+  - Life OS Server: Port 3050 strictly enforced (`next dev -p 3050`)
+  - User Cafe Server: Port 3000 strictly isolated (NEVER touch or terminate)
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Missing Root & Compatibility API Endpoints | Create `/api/dashboard`, `/api/today`, `/api/finance`, `/api/reviews/daily`, `/api/calendar` to satisfy API contracts | M1 | Survey Explorers 1, 2, 3 |
-| 2 | Comprehensive D-1 Advance Reminders API | Extend `/api/reminders/tomorrow` to query bank cheques (`Cheque`), university exams (`UniversityExam`), assignments, and milestones | M1 | Survey Explorer 3 |
-| 3 | Header Bell D-1 UI for Cheques & Exams | Add cheque amount/bank and exam course/room badges and items in `Header.tsx` dropdown popover | M1 | Survey Explorer 3 |
-| 4 | Tomorrow Agenda Widget Enhancement | Extend `TomorrowAgendaWidget.tsx` on `/dashboard` and `/today` to display cheques and exams | M1 | Survey Explorer 3 |
-| 5 | Today Page Live Calendar Block Timeline | Replace hardcoded mock array in `src/app/today/page.tsx` with live DB `CalendarBlock` records | M1 | Survey Explorer 1 |
-| 6 | Goals to Today & Big 3 Feedback Loop | Synchronize task completion in `PATCH /api/tasks` with KeyResult/Objective progress and `DailyReview.big3Completed` | M2 | Survey Explorer 1 |
-| 7 | Unfinished Tasks Rollover to Tomorrow | Implement rollover logic moving today's uncompleted tasks to tomorrow and suggesting empty calendar slots | M2 | Survey Explorer 1 |
-| 8 | Learning to Planner & Calendar Sync | Auto-generate `CalendarBlock`s for university classes/exams and incorporate into `/planner` and capacity engine | M2 | Survey Explorer 1 |
-| 9 | Learning to Today Task Elevation | Ensure university events and exams with today's deadline appear in `/today` and exams set `isBigThree: true` | M2 | Survey Explorer 1 |
-| 10 | Finance Cash Register P&L Sync | Fix `/api/analytics` to include cash register expenses and prevent revenue double-counting | M2 | Survey Explorer 2 |
-| 11 | Reviews to Dashboard & Analytics Sync | Connect `/dashboard` to today's `DailyReview` (deep work hours, productivity, 4 energy levels) and expand analytics trends | M2 | Survey Explorer 2 |
-| 12 | Visual Standards & Theme Stability | Strict pure white (`#ffffff`), crisp black contrast, Vazirmatn font, and Persian digits (`toPersianDigits`, `formatCurrency`) | M1, M2 | Survey Explorer 3 |
-| 13 | Universal Automated E2E Test Suite | Implement `scripts/test-e2e-all.ts` testing all 10 endpoints, full CRUD scenarios, cross-module ripple effects, zero 500s | M3 | Survey Explorers 1, 2, 3 |
-| 14 | TypeScript Compilation Zero Errors | Ensure `node node_modules/typescript/bin/tsc --noEmit` runs with 0 errors (exit code 0) | M3 | Survey Explorer 3 |
-| 15 | Multi-Agent Independent Verification & Audit | 2 Reviewers, 2 Challengers, and Forensic Auditor verification | M4 | Project Pattern |
+| 1 | W3C Web App Manifest & App Metadata | `manifest.webmanifest` & `manifest.json` with standalone display, portrait orientation, pure white theme `#ffffff`, and 4 contextual Persian shortcuts | M1 | Survey Explorer 1 |
+| 2 | High-DPI Brand Icons & Generator | Pure Node.js icon generator (`scripts/generate-pwa-icons.mjs`) generating 180x180, 192x192, 512x512 PNGs and vector `public/icons/icon.svg` based on Layers emblem | M1 | Survey Explorer 1 |
+| 3 | iOS Safari Notch & Safe-Area Adaptation | Next.js 14 layout refactor separating `Viewport` from `Metadata`, `appleWebApp` configuration, and CSS safe-area insets (`--sat`) in `globals.css` and `Header.tsx` | M1 | Survey Explorer 1 |
+| 4 | Multi-Tier Service Worker & Caching | `public/sw.js` with Stale-While-Revalidate for HTML routes, Cache-First for static bundles & Vazirmatn fonts, Network-First for GET APIs, and mutation bypass | M1 | Survey Explorer 1 |
+| 5 | Instantaneous Offline Fallback Shell | `public/offline.html` self-contained white fallback page with Persian typography and retry button for cold offline boots | M1 | Survey Explorer 1 |
+| 6 | Native IndexedDB Local Storage Wrapper | Zero-dependency TypeScript wrapper (`src/lib/pwa/db.ts`) managing `LifeOS_LocalDB` with 10 object stores | M2 | Survey Explorer 2 |
+| 7 | Local-First Zero-Latency Data Reading | Client pages read from IndexedDB first for instant rendering with background cache revalidation | M2 | Survey Explorer 2 |
+| 8 | Offline Mutation Resilience & Unhandled Catch Fix | Fix missing `catch` blocks in `fetchTasks` / `createTask` in `src/app/today/page.tsx` and `src/app/tasks/page.tsx`, storing mutations locally when offline | M2 | Survey Explorer 2 |
+| 9 | Finance & Review Offline Persistence | Persist cash register reconciliation, daily reviews, and financial transactions to IndexedDB when network is unavailable | M2 | Survey Explorer 2 |
+| 10 | Server Ping Heartbeat Endpoint | Lightweight `GET /api/ping` endpoint without database queries returning 200 OK with `Cache-Control: no-store` | M3 | Survey Explorer 3 |
+| 11 | Persistent Outbox Queue Architecture | Atomic transactional persistence of offline mutations (`OutboxMutation`) in IndexedDB surviving reloads | M3 | Survey Explorer 3 |
+| 12 | Chronological FIFO Replay & Idempotency | Sequential mutation processor with mutex locks, `X-Idempotency-Key` headers, and client temp ID remapping | M3 | Survey Explorer 3 |
+| 13 | Dual-Layer Online Detection & Inbound Refresh | Window `online`/`offline` listeners combined with `/api/ping` heartbeat, triggering post-drain inbound data refresh | M3 | Survey Explorer 3 |
+| 14 | Header Connectivity & Sync Indicator UI | 3-state visual status indicator in `src/components/layout/Header.tsx` (Online, Offline, Syncing with pending count in Persian digits) and popover | M3 | Survey Explorer 3 |
+| 15 | Universal PWA E2E Test Suite | Automated test suite `scripts/test-pwa-local-first.ts` covering manifests, SW, IndexedDB, offline mutations, sync replay, and ports | M4 | E2E Testing Track |
+| 16 | TypeScript Compilation Zero Errors | Verification that `node node_modules/typescript/bin/tsc --noEmit` exits with 0 errors | M4 | Project Requirement |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | System API Endpoints & D-1 Reminders Expansion | Create 5 missing endpoints (`/api/dashboard`, `/api/today`, `/api/finance`, `/api/reviews/daily`, `/api/calendar`), extend `/api/reminders/tomorrow` (cheques & exams), update `Header.tsx` & `TomorrowAgendaWidget.tsx`, connect `/today` timeline to live DB blocks | none | DONE |
-| M2 | Cross-Module Synchronization & Data Flow | Goal-to-Today completion feedback, task rollover to tomorrow with slot suggestion, learning-to-planner calendar sync, finance cash register P&L fix, reviews-to-dashboard/analytics sync | M1 | IN_PROGRESS |
-| M3 | Universal Automated E2E Test Suite & Clean Typecheck | Develop and verify `scripts/test-e2e-all.ts` testing all 10 endpoints, CRUD, ripple effects, zero 500s, `tsc --noEmit` exit 0 | M1, M2 | PLANNED |
-| M4 | Independent Reviews, Challengers & Forensic Audit | 2 Reviewers, 2 Challengers, 1 Forensic Auditor, full test execution, Sentinel completion handoff | M1, M2, M3 | PLANNED |
+| M1 | PWA Shell, iOS Safari Integration & Service Worker | Manifests, brand icons, Next.js layout & viewport, iOS safe-areas, `sw.js` with 5 cache tiers, `offline.html`, `ServiceWorkerRegister.tsx` | none | DONE |
+| M2 | Native IndexedDB Local Store & Offline Resilience | `db.ts` wrapper with 10 stores, local-first reading, unhandled catch fixes, offline task/habit/finance persistence | M1 | IN_PROGRESS |
+| M3 | Sync Engine, Outbox Mutation Queue & Header Status UI | `/api/ping`, `outbox.ts`, `sync-engine.ts`, FIFO replay, temp ID remapping, Header 3-state sync indicator | M2 | PLANNED |
+| M4 | E2E Testing, Adversarial Verification & Clean Build | `test-pwa-local-first.ts`, 100% test pass (existing 49 tests + PWA suite), zero TypeScript errors, port 3050 & 3000 verification | M1, M2, M3 | PLANNED |
 
 ## Interface Contracts
 
-### 1. `/api/dashboard` (GET)
-- Response JSON:
-  ```typescript
-  {
-    success: true,
-    activeCycle: { id: string, title: string, progress: number },
-    todayTasks: Array<{ id: string, title: string, isBigThree: boolean, status: string }>,
-    todayReview: { productivityScore: number, deepWorkHours: number, energyPhysical: number, energyEmotional: number, energyMental: number, energySpiritual: number } | null,
-    financialSummary: { totalLiquidBalance: number, todayIncome: number, todayExpense: number, unreconciledRegisters: number },
-    tomorrowRemindersSummary: { totalItems: number, blocksCount: number, tasksCount: number, chequesCount: number, examsCount: number }
-  }
-  ```
+### 1. Web App Manifest (`/manifest.webmanifest`, `/manifest.json`)
+```json
+{
+  "name": "Life OS — سیستم‌عامل جامع مدیریت زندگی",
+  "short_name": "Life OS",
+  "start_url": "/today?source=pwa",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "dir": "rtl",
+  "lang": "fa-IR",
+  "icons": [
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+```
 
-### 2. `/api/today` (GET, POST)
-- GET Response JSON:
-  ```typescript
-  {
-    success: true,
-    todayDate: string,
-    todayPersianDate: string,
-    big3: Array<{ id: string, title: string, status: string, estimatedMinutes: number }>,
-    otherTasks: Array<{ id: string, title: string, status: string, priority: string }>,
-    calendarBlocks: Array<{ id: string, title: string, start: string, end: string, type: string }>,
-    habits: Array<{ id: string, title: string, completed: boolean }>,
-    cashRegister: { openingCash: number, salesCash: number, actualClosingCash: number, reconciled: boolean } | null,
-    waterLiters: number,
-    reviewCompleted: boolean
-  }
-  ```
+### 2. Service Worker (`public/sw.js`)
+- Cache namespaces: `life-os-static-v1`, `life-os-pages-v1`, `life-os-assets-v1`, `life-os-fonts-v1`
+- Navigation strategy: Stale-While-Revalidate with fallback to `/offline.html`
+- Static & Fonts: Cache-First
+- API GET: Network-First with Cache-Fallback
+- Mutations (POST/PUT/PATCH/DELETE): Direct network passthrough
 
-### 3. `/api/finance` (GET, POST)
-- GET Response JSON:
-  ```typescript
-  {
-    success: true,
-    summary: { totalLiquidBalance: number, totalIncomes: number, totalExpenses: number, netProfit: number },
-    accounts: Array<{ id: string, name: string, balance: number, type: string }>,
-    costCenters: Array<{ id: string, name: string, code: string }>,
-    recentTransactions: Array<{ id: string, title: string, amount: number, type: string, date: string }>,
-    cashRegisters: Array<{ id: string, date: string, salesCash: number, difference: number, reconciled: boolean }>
-  }
-  ```
+### 3. Native IndexedDB Local Store (`LifeOS_LocalDB`, version 1)
+- Object stores:
+  - `tasks` (keyPath: `id`)
+  - `habits` (keyPath: `id`)
+  - `habit_logs` (keyPath: `id`)
+  - `projects` (keyPath: `id`)
+  - `daily_reviews` (keyPath: `id`)
+  - `cash_registers` (keyPath: `id`)
+  - `transactions` (keyPath: `id`)
+  - `calendar_blocks` (keyPath: `id`)
+  - `outbox_queue` (keyPath: `id`, index: `status`, `createdAt`)
+  - `metadata` (keyPath: `key`)
 
-### 4. `/api/reviews/daily` (GET, POST, PATCH)
-- Handles same payload as `/api/reviews`, ensuring full CRUD for daily reviews with 4 energy levels.
+### 4. Outbox Mutation Record (`OutboxMutation`)
+```typescript
+interface OutboxMutation {
+  id: string;              // Client UUID
+  endpoint: string;        // Target URL e.g. "/api/tasks"
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  payload: any;            // JSON body
+  createdAt: number;       // Timestamp ms
+  status: 'pending' | 'syncing' | 'failed';
+  retryCount: number;
+  tempEntityId?: string;   // For mapping client ID to server ID
+  idempotencyKey: string;  // X-Idempotency-Key
+}
+```
 
-### 5. `/api/calendar` (GET, POST)
-- Wraps/delegates to `/api/planner`, querying/creating `CalendarBlock` records with optional date filters.
+### 5. Server Heartbeat (`GET /api/ping`)
+- Response: `{ success: true, timestamp: number }`
+- Header: `Cache-Control: no-store, no-cache, must-revalidate`
+- Response time: < 2ms, zero database calls
 
-### 6. `/api/reminders/tomorrow` (GET)
-- Response JSON includes:
-  ```typescript
-  {
-    success: true,
-    tomorrowDate: string,
-    tomorrowPersianDate: string,
-    summary: { totalItems: number, blocksCount: number, tasksCount: number, workoutsCount: number, chequesCount: number, examsCount: number },
-    blocks: Array<...>,
-    tasks: Array<...>,
-    workouts: Array<...>,
-    cheques: Array<{ id: string, chequeNumber: string, bankName: string, amount: number, payeeOrPayer: string, chequeType: string }>,
-    exams: Array<{ id: string, title: string, courseTitle: string, examDate: string, room: string, weight: number }>
-  }
-  ```
+### 6. Header Connectivity Indicator State
+- `status`: `'online' | 'offline' | 'syncing'`
+- `pendingCount`: number of pending mutations in `outbox_queue`
+- Persian formatting via `toPersianDigits`
+- Visual styling strictly adhering to `#ffffff` minimal black & white design
 
 ## Code Layout
-- `src/app/api/dashboard/route.ts` — Dashboard aggregator API
-- `src/app/api/today/route.ts` — Today aggregator & daily overview API
-- `src/app/api/finance/route.ts` — Finance aggregator API
-- `src/app/api/reviews/daily/route.ts` — Daily review alias API
-- `src/app/api/calendar/route.ts` — Calendar blocks alias API
-- `src/app/api/reminders/tomorrow/route.ts` — Enhanced D-1 Reminders API with cheques and exams
-- `src/components/layout/Header.tsx` — Header Bell with badges for cheques and exams
-- `src/components/dashboard/TomorrowAgendaWidget.tsx` — Enhanced widget with cheques and exams
-- `src/app/today/page.tsx` — Today page with live calendar blocks and rollover action
-- `src/app/planner/page.tsx` — Planner page with university class blocks and rollover slot suggestions
-- `src/app/api/tasks/route.ts` — Enhanced tasks API with rollover and OKR sync
-- `src/app/api/learning/route.ts` — Enhanced learning API with CalendarBlock generation
-- `src/app/api/analytics/route.ts` — Fixed P&L analytics with cash register expense accounting
-- `src/app/dashboard/page.tsx` — Dashboard connected to live DailyReview metrics
-- `scripts/test-e2e-all.ts` — Universal automated E2E test suite
+- `public/manifest.webmanifest` & `public/manifest.json` — W3C PWA manifests
+- `public/sw.js` — Service worker script
+- `public/offline.html` — Offline fallback shell
+- `public/icons/` — Application raster and vector icons
+- `scripts/generate-pwa-icons.mjs` — Pure Node.js icon generator
+- `src/components/pwa/ServiceWorkerRegister.tsx` — Service worker registration component
+- `src/app/layout.tsx` — Next.js 14 layout with Viewport & Apple meta configuration
+- `src/app/globals.css` — Safe-area insets and PWA CSS rules
+- `src/lib/pwa/db.ts` — Native IndexedDB client wrapper
+- `src/lib/pwa/local-store.ts` — Local-first caching layer and domain abstractions
+- `src/lib/pwa/outbox.ts` — Outbox queue persistence and operations
+- `src/lib/pwa/sync-engine.ts` — Online detection and FIFO replay engine
+- `src/app/api/ping/route.ts` — Lightweight heartbeat ping endpoint
+- `src/components/layout/Header.tsx` — Header with connectivity & sync status indicator
+- `scripts/test-pwa-local-first.ts` — Universal PWA & Local-First automated test suite
