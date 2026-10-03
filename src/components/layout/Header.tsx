@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Calendar, Bell, ShieldCheck, Sparkles, Clock, CheckSquare, Dumbbell, ArrowLeft, X, Receipt, GraduationCap, User as UserIcon, LogOut } from "lucide-react";
+import { Plus, Calendar, Bell, ShieldCheck, Sparkles, Clock, CheckSquare, Dumbbell, ArrowLeft, X, Receipt, GraduationCap, User as UserIcon, LogOut, Menu } from "lucide-react";
 import { getTodayPersianString, toPersianDigits, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 
 interface HeaderProps {
   onOpenQuickCapture: () => void;
+  onOpenMobileMenu?: () => void;
 }
 
-export default function Header({ onOpenQuickCapture }: HeaderProps) {
+export default function Header({ onOpenQuickCapture, onOpenMobileMenu }: HeaderProps) {
   const [persianDate, setPersianDate] = useState("");
   const [reminderData, setReminderData] = useState<{
     tomorrowPersianDate: string;
@@ -91,29 +92,40 @@ export default function Header({ onOpenQuickCapture }: HeaderProps) {
   const totalTomorrowCount = reminderData?.summary?.totalItems || 0;
 
   return (
-    <header className="h-16 border-b border-zinc-200 bg-white/90 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
-      {/* Left: Today Info & Phase */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-zinc-600 text-xs">
-          <Calendar className="w-4 h-4 text-zinc-500" />
-          <span className="font-bold text-zinc-900">{persianDate || "امروز"}</span>
+    <header className="h-16 border-b border-zinc-200 bg-white/90 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30">
+      {/* Start (Right in RTL): Menu button & Today Info */}
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+        {onOpenMobileMenu && (
+          <button
+            type="button"
+            onClick={onOpenMobileMenu}
+            className="md:hidden w-8 h-8 rounded-lg border border-zinc-200 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 flex items-center justify-center transition-all shrink-0 active:scale-95"
+            title="منوی اصلی و ناوبری"
+            aria-label="منو"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+        )}
+        <div className="flex items-center gap-1.5 sm:gap-2 text-zinc-600 text-xs shrink-0">
+          <Calendar className="w-4 h-4 text-zinc-500 shrink-0" />
+          <span className="font-bold text-zinc-900 truncate">{persianDate || "امروز"}</span>
         </div>
-        <div className="h-4 w-px bg-zinc-200" />
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-zinc-700 bg-zinc-100 border border-zinc-200 px-3 py-1 rounded-lg">
+        <div className="hidden sm:block h-4 w-px bg-zinc-200" />
+        <div className="hidden lg:flex items-center gap-1.5 text-xs text-zinc-700 bg-zinc-100 border border-zinc-200 px-3 py-1 rounded-lg">
           <Sparkles className="w-3.5 h-3.5 text-black" />
           <span>چرخه ۹۰ روزه: روز {toPersianDigits(34)} از {toPersianDigits(90)} (فاز ساخت)</span>
         </div>
       </div>
 
-      {/* Right: Actions */}
-      <div className="flex items-center gap-3">
+      {/* End (Left in RTL): Actions */}
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Quick Add Button (High-Contrast Black Button) */}
         <button
           onClick={onOpenQuickCapture}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-black hover:bg-zinc-800 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black hover:bg-zinc-800 text-white text-xs font-bold shadow-sm transition-all active:scale-95"
           title="ثبت سریع (کلید میانبر: Ctrl+K)"
         >
-          <Plus className="w-4 h-4 text-white" />
+          <Plus className="w-3.5 h-3.5 text-white" />
           <span>ثبت سریع</span>
           <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[10px] bg-zinc-800 border border-zinc-700 rounded text-zinc-200">
             Ctrl+K
@@ -121,20 +133,20 @@ export default function Header({ onOpenQuickCapture }: HeaderProps) {
         </button>
 
         {/* Audit Status */}
-        <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg">
+        <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg">
           <ShieldCheck className="w-3.5 h-3.5 text-black" />
           <span>صندوق و انبار بالانس</span>
         </div>
 
         {/* User Profile & Logout */}
-        <div className="flex items-center gap-1.5 border-r border-zinc-200 pr-3 mr-1">
-          <div className="flex items-center gap-1.5 text-xs text-zinc-800 bg-zinc-100/90 border border-zinc-200 px-2.5 py-1 rounded-lg">
-            <UserIcon className="w-3.5 h-3.5 text-zinc-600" />
-            <span className="font-bold">{currentUser?.name || "سجاد"}</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 border-r border-zinc-200 pr-2 mr-0.5 sm:pr-3 sm:mr-1">
+          <div className="flex items-center gap-1 sm:gap-1.5 text-xs text-zinc-800 bg-zinc-100/90 border border-zinc-200 px-2 py-1 rounded-lg max-w-[100px] sm:max-w-none">
+            <UserIcon className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+            <span className="font-bold truncate">{currentUser?.name || "سجاد"}</span>
           </div>
           <button
             onClick={handleLogout}
-            className="w-8 h-8 rounded-lg border border-zinc-200 bg-zinc-50 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-zinc-600 flex items-center justify-center transition-all"
+            className="w-8 h-8 rounded-lg border border-zinc-200 bg-zinc-50 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-zinc-600 flex items-center justify-center transition-all shrink-0"
             title="خروج از حساب کاربری"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -162,7 +174,7 @@ export default function Header({ onOpenQuickCapture }: HeaderProps) {
 
           {/* Popover Dropdown */}
           {isOpen && (
-            <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white border border-zinc-200 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 text-right">
+            <div className="absolute left-0 mt-2 w-[calc(100vw-1.5rem)] sm:w-96 max-w-[390px] bg-white border border-zinc-200 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 text-right">
               {/* Popover Header */}
               <div className="p-4 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between">
                 <div>

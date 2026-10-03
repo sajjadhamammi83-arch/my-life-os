@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -24,6 +25,8 @@ import {
   Clock,
   FolderTree,
   ChevronLeft,
+  X,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,11 +55,41 @@ const secondaryNav = [
   { name: "تنظیمات", href: "/settings", icon: Settings },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  onCloseMobile?: () => void;
+  isMobile?: boolean;
+}
+
+export default function Sidebar({ onCloseMobile, isMobile }: SidebarProps = {}) {
   const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState<{ username: string; name: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
 
   return (
-    <aside className="w-64 bg-white border-l border-zinc-200 flex flex-col h-screen sticky top-0 shrink-0 select-none z-30 shadow-sm">
+    <aside
+      className={cn(
+        "bg-white border-l border-zinc-200 flex flex-col select-none shadow-sm",
+        isMobile ? "w-full h-full" : "w-64 h-screen sticky top-0 shrink-0 z-30"
+      )}
+    >
       {/* Brand Header */}
       <div className="p-4 border-b border-zinc-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -69,9 +102,19 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-zinc-600 font-bold">
-          v2.5
-        </span>
+        {isMobile ? (
+          <button
+            onClick={onCloseMobile}
+            className="w-8 h-8 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-all"
+            title="بستن منو"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        ) : (
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-zinc-600 font-bold">
+            v2.5
+          </span>
+        )}
       </div>
 
       {/* Navigation Links */}
@@ -90,6 +133,7 @@ export default function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onCloseMobile}
                   className={cn(
                     "flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all font-medium",
                     isActive
@@ -134,6 +178,7 @@ export default function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onCloseMobile}
                   className={cn(
                     "flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all font-medium",
                     isActive
@@ -155,22 +200,37 @@ export default function Sidebar() {
       {/* User Footer Profile */}
       <div className="p-3 border-t border-zinc-200 bg-zinc-50/80">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs">
-              L
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center font-bold text-xs shrink-0">
+              {currentUser?.name?.[0] || currentUser?.username?.[0]?.toUpperCase() || "L"}
             </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold text-zinc-900 truncate">مدیر سیستم‌عامل</p>
-              <p className="text-[10px] text-zinc-500 truncate">بوفه • آرایشی • رایش</p>
+            <div className="overflow-hidden min-w-0">
+              <p className="text-xs font-bold text-zinc-900 truncate">
+                {currentUser?.name || "مدیر سیستم‌عامل"}
+              </p>
+              <p className="text-[10px] text-zinc-500 truncate">
+                @{currentUser?.username || "sajjad"}
+              </p>
             </div>
           </div>
 
-          <Link
-            href="/settings"
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-black hover:bg-zinc-200 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-1 shrink-0">
+            <Link
+              href="/settings"
+              onClick={onCloseMobile}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-black hover:bg-zinc-200 transition-colors"
+              title="تنظیمات سیستم"
+            >
+              <Settings className="w-4 h-4" />
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              title="خروج از حساب"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>
