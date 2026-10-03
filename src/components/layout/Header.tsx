@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Calendar, Bell, ShieldCheck, Sparkles, Clock, CheckSquare, Dumbbell, ArrowLeft, X, Receipt, GraduationCap } from "lucide-react";
+import { Plus, Calendar, Bell, ShieldCheck, Sparkles, Clock, CheckSquare, Dumbbell, ArrowLeft, X, Receipt, GraduationCap, User as UserIcon, LogOut } from "lucide-react";
 import { getTodayPersianString, toPersianDigits, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 
@@ -44,8 +44,31 @@ export default function Header({ onOpenQuickCapture }: HeaderProps) {
     }
   };
 
+  const [currentUser, setCurrentUser] = useState<{ username: string; name: string } | null>(null);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch("/api/auth/me");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+        }
+      }
+    } catch {}
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
   useEffect(() => {
     setPersianDate(getTodayPersianString());
+    fetchCurrentUser();
     fetchTomorrowReminders();
 
     const handleRemindersUpdated = () => {
@@ -98,9 +121,24 @@ export default function Header({ onOpenQuickCapture }: HeaderProps) {
         </button>
 
         {/* Audit Status */}
-        <div className="flex items-center gap-1.5 text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg">
+        <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-zinc-700 bg-zinc-100 border border-zinc-200 px-2.5 py-1 rounded-lg">
           <ShieldCheck className="w-3.5 h-3.5 text-black" />
-          <span className="hidden md:inline">صندوق و انبار بالانس</span>
+          <span>صندوق و انبار بالانس</span>
+        </div>
+
+        {/* User Profile & Logout */}
+        <div className="flex items-center gap-1.5 border-r border-zinc-200 pr-3 mr-1">
+          <div className="flex items-center gap-1.5 text-xs text-zinc-800 bg-zinc-100/90 border border-zinc-200 px-2.5 py-1 rounded-lg">
+            <UserIcon className="w-3.5 h-3.5 text-zinc-600" />
+            <span className="font-bold">{currentUser?.name || "سجاد"}</span>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="w-8 h-8 rounded-lg border border-zinc-200 bg-zinc-50 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-zinc-600 flex items-center justify-center transition-all"
+            title="خروج از حساب کاربری"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Notifications & Tomorrow Agenda Popover */}
